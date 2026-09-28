@@ -99,6 +99,7 @@ async fn queue_round_trip() {
     ipc::set_socket_path_override(Some(tmp_socket("queue")));
 
     let queue = QueueSnapshot {
+        key: "test-queue".into(),
         current_index: Some(1),
         songs: vec![
             pigma::ipc::QueueEntry {

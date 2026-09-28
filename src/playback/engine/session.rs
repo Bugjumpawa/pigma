@@ -119,7 +119,7 @@ impl PlaybackEngine {
             ),
             None => PlaylistQueue::new(),
         };
-        self.queue = queue;
+        self.replace_queue(queue);
         self.active_queue_key = display.to_string();
         self.active_queue_id = id.to_string();
         self.strategy =
@@ -191,11 +191,11 @@ impl PlaybackEngine {
             {
                 self.active_queue_id = id;
                 self.active_queue_key = display;
-                self.queue = PlaylistQueue::from_parts(
+                self.replace_queue(PlaylistQueue::from_parts(
                     saved.queue.into_iter().map(Arc::new).collect(),
                     saved.history,
                     saved.current_index,
-                );
+                ));
                 self.state.volume = saved.volume;
                 self.strategy =
                     mode::create_strategy(&saved.mode, self.queue.len(), self.queue.current_index);

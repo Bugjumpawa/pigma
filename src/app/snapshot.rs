@@ -70,6 +70,7 @@ impl App {
             self.ipc.last_queue_version = version;
             if let Ok(mut queue) = self.ipc.queue.lock() {
                 *queue = QueueSnapshot {
+                    key: self.playback.queue_key().to_string(),
                     current_index: self.playback.queue_current_index(),
                     songs: self
                         .playback

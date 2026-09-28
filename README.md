@@ -213,9 +213,8 @@ Add-Content $PROFILE '. "$HOME/.config/powershell/pigma.ps1"'
 |---|---|
 | `pigma status` | 查询状态（默认 plain 文本） |
 | `pigma status --json` | 以 JSON 输出 |
-| `pigma status -L` | 列出当前播放队列（`>` 标记当前曲目），`-L --json` 输出原始 `QueueSnapshot` |
+| `pigma status -L` | 列出当前队列（`>` 标记当前曲目，末列是歌曲 `id`，可直接配 `pigma msg play <id>`），`-L --json` 输出原始 `QueueSnapshot`（含队列 `key`） |
 | `pigma status --template "{name}  {artist}  {current}/{duration}  {status}  vol {volume}%"` | 自定义 plain 输出模板 |
-| `pigma msg list` | 列出当前播放队列（`▶` 标记当前曲目），`--json` 输出原始 `QueueSnapshot` |
 | `pigma msg next` / `pigma msg previous` | 下一首 / 上一首 |
 | `pigma msg pause` / `pigma msg play` | 暂停 / 播放（`pigma msg play <song-id>` 按 id 跳播队列中的歌曲） |
 | `pigma msg search <keyword>` | 搜索并返回歌曲数据（NCM + 已启用 sonar 源，标出 `source` 和 `id`），再 `pigma msg play <id>` 播放选中的那首 |

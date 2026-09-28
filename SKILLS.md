@@ -61,7 +61,7 @@ pigma completions fish > ~/.config/fish/completions/pigma.fish
 ```
 
 支持 `bash` / `zsh` / `fish` / `elvish` / `powershell`。补全会列出子命令与选项；
-`pigma msg <Tab>` 会补全动作名（`previous`/`next`/`play`/`switch-list`/`list` 等，含别名）。
+`pigma msg <Tab>` 会补全动作名（`previous`/`next`/`play`/`switch-list` 等，含别名）。
 
 ---
 
@@ -91,14 +91,14 @@ pigma status --template "{artist} – {name} [{status}] vol {volume}%"
 
 ---
 
-## `pigma msg list` – 列出播放队列
+## `pigma status -L` – 列出当前队列
 
-查询**正在运行**的实例的当前播放队列（复用 TUI 队列表格的显示逻辑），
-`▶` 标记当前曲目：
+查询**正在运行**的实例的当前队列，`>` 标记当前曲目，末列是歌曲 `id`
+（可直接配 `pigma msg play <id>`）：
 
 ```bash
-pigma msg list            # 列出当前播放队列
-pigma msg list --json     # 原始 QueueSnapshot（id/name/singer/album/duration_ms）
+pigma status -L            # 列表（含 id）
+pigma status -L --json     # 原始 QueueSnapshot（含队列 key；id/name/singer/album/duration_ms）
 ```
 
 选项：`--json`、`--socket <SOCKET>`。
@@ -119,7 +119,6 @@ pigma msg [OPTIONS] <ACTION> [VALUE]
 | `pause` | | 暂停 |
 | `next` | | 下一首 |
 | `previous` | `prev` | 上一首 |
-| `list` | | 列出当前播放队列（`▶` 标记当前曲目；`--json` 输出原始 `QueueSnapshot`） |
 | `switch-list <ENDPOINT>` | `switch` | 动态切换队列到指定端点；歌单端点用 `--playlist N` 选第 N 个（1 起始） |
 | `volume <VALUE>` | | `75`=绝对音量 0-100；`+5`/`-10`=相对 ±% |
 | `mode` | | 切换播放模式 |
@@ -127,18 +126,17 @@ pigma msg [OPTIONS] <ACTION> [VALUE]
 | `dislike` | | 不喜欢当前曲目 |
 | `toggle_like` | `unlike` `toggle` | 喜欢/取消喜欢（切换） |
 
-选项：`--playlist <INDEX>`（switch-list 用）、`--json`（list 用）、`--socket <SOCKET>`。
+选项：`--playlist <INDEX>`（switch-list 用）、`--socket <SOCKET>`。
 
 ```bash
 pigma msg play
-pigma msg play 187186        # 按歌曲 id 播放（先 `pigma msg list --json` 查 id）
+pigma msg play 187186        # 按歌曲 id 播放（先 `pigma status -L --json` 查 id）
 pigma msg search 周杰伦       # 返回: source + id + 歌名 - 歌手（在守护进程内搜索，跨实例可用）
 pigma msg play 11201139274454706721  # 播放上面搜到的某首 sonar 结果
 pigma msg toggle_play
 pigma msg next
 pigma msg volume 75
 pigma msg volume +5
-pigma msg list               # 列出当前播放队列
 pigma msg switch-list toplist --playlist 2
 pigma msg toggle_like
 ```
