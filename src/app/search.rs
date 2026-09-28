@@ -1,10 +1,13 @@
+//! TUI search-bar orchestration: turns keyboard input into navigation state and
+//! spawned searches, surfacing results via [`crate::event::NavigationEvent`]s.
+//! The execution shared with the IPC `search` server lives in [`shared`].
+
+pub mod shared;
+
 use std::sync::Arc;
 
-use super::{
-    App,
-    search_core::{search_ncm, search_sonar},
-    send_event,
-};
+use self::shared::{search_ncm, search_sonar};
+use super::{App, event::send_event};
 use crate::{
     event::NavigationEvent,
     state::{ContentState, SearchProvider},
@@ -20,7 +23,7 @@ impl App {
     }
 
     /// TUI-only orchestration for an NCM search: mark the loading state, spawn
-    /// the search (delegating to [`search_core::search_ncm`]) and hand the
+    /// the search (delegating to [`shared::search_ncm`]) and hand the
     /// resulting `ContentState` to the navigation via an event.
     fn submit_ncm_search(&mut self, keyword: String) {
         self.state.navigation.set_content(ContentState::Loading);
@@ -30,7 +33,7 @@ impl App {
         let service = self.service.clone();
         let sender = self.state.events.sender();
         let limit = self.config.search_limit as usize;
-        let search_results = self.search_results.clone();
+        let search_results = self.search.results.clone();
         tokio::spawn(async move {
             let state = search_ncm(&service, &search_results, &keyword, limit).await;
             send_event(&sender, NavigationEvent::ContentLoaded(state).into());
@@ -39,7 +42,7 @@ impl App {
 
     /// TUI-only orchestration for a single-source sonar search: build a finder
     /// restricted to the selected provider, then delegate to
-    /// [`search_core::search_sonar`] and surface the result via an event.
+    /// [`shared::search_sonar`] and surface the result via an event.
     fn submit_sonar_search(&mut self, keyword: String, provider: SearchProvider) {
         self.state.navigation.set_content(ContentState::Loading);
         self.state.navigation.content_is_search = true;
@@ -48,8 +51,8 @@ impl App {
         self.state.navigation.content_selected = 0;
         let source = provider.to_sonar().expect("sonar provider");
         let sender = self.state.events.sender();
-        let registry = self.sonar_songs.clone();
-        let search_results = self.search_results.clone();
+        let registry = self.search.sonar_songs.clone();
+        let search_results = self.search.results.clone();
         let limit = self.config.search_limit as usize;
         tokio::spawn(async move {
             let config = sonar::SearchConfig::new()

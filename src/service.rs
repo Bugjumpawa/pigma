@@ -193,7 +193,7 @@ impl ApiService {
     }
 
     /// Resolve an endpoint into a displayable [`ContentState`], handling the local
-    /// sources (`Download` / `LocalMusic`) and `LikedSongs` that [`resolve_content`]
+    /// sources (`Download` / `LocalMusic`) and `LikedSongs` that [`Self::resolve_content`]
     /// deliberately leaves to its caller. Shared by `App::load_endpoint` (which then
     /// loads the resolved songs into the queue) and the TUI's content page, so the
     /// endpoint→content mapping lives in exactly one place.
@@ -214,15 +214,20 @@ impl ApiService {
                 let songs = self.cache().list_cached_songs_async().await;
                 ContentState::Songs(songs.into_iter().map(std::sync::Arc::new).collect())
             }
-            ApiEndpoint::LocalMusic => {
-                let music_dir = dirs::home_dir().unwrap_or_default().join("Music");
-                let songs = tokio::task::spawn_blocking(move || scan_local_music(&music_dir))
-                    .await
-                    .unwrap_or_default();
-                ContentState::Songs(songs.into_iter().map(std::sync::Arc::new).collect())
-            }
+            ApiEndpoint::LocalMusic => self.load_local_music().await,
             _ => self.resolve_content(api, uid, limit).await.0,
         }
+    }
+
+    /// Scan the user's Music directory off the async runtime and map it to a
+    /// `Songs` content state. Shared by the TUI local-music tab (which adds
+    /// content-cache read/write around it) and headless endpoint loading.
+    pub async fn load_local_music(&self) -> ContentState {
+        let music_dir = dirs::home_dir().unwrap_or_default().join("Music");
+        let songs = tokio::task::spawn_blocking(move || scan_local_music(&music_dir))
+            .await
+            .unwrap_or_default();
+        ContentState::Songs(songs.into_iter().map(Arc::new).collect())
     }
 
     /// Load liked songs through the user's created "我喜欢的音乐" playlist so the
