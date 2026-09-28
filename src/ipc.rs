@@ -19,6 +19,8 @@ pub mod protocol;
 pub mod server;
 pub mod snapshot;
 
+mod transport;
+
 pub use client::*;
 pub use path::*;
 pub use protocol::*;

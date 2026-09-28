@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     config::Config,
-    utils::{local_timestamp, pigma_config_dir},
+    utils::{local_timestamp, lock_recover, pigma_config_dir},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,7 +47,7 @@ impl Log for FileLogger {
             return;
         }
         let ts = local_timestamp();
-        let mut file = self.file.lock().unwrap();
+        let mut file = lock_recover(&self.file);
         let _ = writeln!(
             file,
             "[{} {:<5} {}] {}",
@@ -59,7 +59,7 @@ impl Log for FileLogger {
     }
 
     fn flush(&self) {
-        let _ = self.file.lock().unwrap().flush();
+        let _ = lock_recover(&self.file).flush();
     }
 }
 

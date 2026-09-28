@@ -1,7 +1,5 @@
 //! IPC client used by the `pigma status` / `pigma msg` CLI commands.
 
-use std::path::Path;
-
 use color_eyre::eyre::{OptionExt, WrapErr};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
@@ -9,32 +7,14 @@ use super::{
     path::resolve_socket_path,
     protocol::{IpcRequest, MsgAction},
     snapshot::{QueueSnapshot, SearchEntry, StatusSnapshot},
+    transport,
 };
-
-/// The stream a client connects with (Unix socket on unix, named pipe on
-/// Windows).
-#[cfg(unix)]
-type ClientStream = tokio::net::UnixStream;
-#[cfg(windows)]
-type ClientStream = tokio::net::windows::named_pipe::NamedPipeClient;
-
-/// Connect to the running instance's listener endpoint.
-async fn client_connect(path: &Path) -> std::io::Result<ClientStream> {
-    #[cfg(unix)]
-    {
-        ClientStream::connect(path).await
-    }
-    #[cfg(windows)]
-    {
-        tokio::net::windows::named_pipe::ClientOptions::new().open(path.to_string_lossy().as_ref())
-    }
-}
 
 /// Connect to the running TUI's listener, returning a descriptive error when no
 /// instance is up.
-async fn connect() -> color_eyre::Result<ClientStream> {
+async fn connect() -> color_eyre::Result<transport::ClientStream> {
     let path = resolve_socket_path();
-    client_connect(&path)
+    transport::connect_client(&path)
         .await
         .wrap_err("pigma is not running (start the TUI or `pigma -d`, or check --socket)")
 }
