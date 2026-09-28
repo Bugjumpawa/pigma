@@ -97,10 +97,14 @@ impl QueueEntry {
     }
 }
 
-/// Full queue listing served to `pigma status -L`: the current song's queue
-/// index (0-based, `None` when nothing is queued) plus the songs.
+/// Full queue listing served to `pigma status -L`: the active queue's display
+/// key, the current song's index (0-based, `None` when nothing is queued) and
+/// the songs.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct QueueSnapshot {
+    /// Display key of the active queue — the queue that `next` / `pigma msg
+    /// play <id>` operate on. Changes when the queue is switched.
+    pub key: String,
     pub current_index: Option<usize>,
     pub songs: Vec<QueueEntry>,
 }

@@ -33,6 +33,15 @@ impl PlaylistQueue {
         self.version
     }
 
+    /// Replace this queue's contents with `next`, carrying the change counter
+    /// forward so consumers watching [`Self::version`] (e.g. the IPC queue
+    /// snapshot) still detect the swap. A freshly built queue starts at 0, which
+    /// could otherwise collide with this queue's value and hide the change.
+    pub(super) fn replace_with(&mut self, mut next: PlaylistQueue) {
+        next.version = self.version.wrapping_add(1);
+        *self = next;
+    }
+
     /// Mark the queue as changed. Used when callers mutate `current_index`
     /// directly (outside the methods that bump automatically).
     pub(super) fn bump(&mut self) {
@@ -213,5 +222,23 @@ mod tests {
         let q = PlaylistQueue::from_parts(vec![song(7), song(8)], vec![7], Some(0));
         assert_eq!(q.find_song_index(8), Some(1));
         assert_eq!(q.history, vec![7]);
+    }
+
+    /// A replacement queue must not reset the change counter: the IPC queue
+    /// snapshot keys off `version`, so a reset could collide with the previous
+    /// value and hide the queue switch (`pigma status -L` showing a stale queue).
+    #[test]
+    fn replace_with_keeps_version_monotonic() {
+        let mut q = PlaylistQueue::from_songs(vec![song(1)], 0);
+        q.bump();
+        assert_eq!(q.version(), 1);
+
+        let replacement = PlaylistQueue::from_songs(vec![song(2)], 0);
+        assert_eq!(replacement.version(), 0);
+        q.replace_with(replacement);
+
+        assert_eq!(q.version(), 2);
+        assert_eq!(q.songs[0].id, 2);
+        assert_eq!(q.current_song().map(|s| s.id), Some(2));
     }
 }

@@ -67,7 +67,7 @@ impl PlaybackEngine {
         self.activate_queue(&key);
         self.playing_queue_key = self.active_queue_key.clone();
         self.controller.stop();
-        self.queue = PlaylistQueue::from_songs(songs, index);
+        self.replace_queue(PlaylistQueue::from_songs(songs, index));
         self.strategy =
             mode::create_strategy(&self.state.mode, self.queue.len(), self.queue.current_index);
         self.state.current_song = self.queue.current_song().cloned();
@@ -254,7 +254,7 @@ impl PlaybackEngine {
             .current_song()
             .zip(self.state.current_song.as_ref())
             .is_some_and(|(a, b)| a.id == b.id);
-        self.queue = PlaylistQueue::new();
+        self.replace_queue(PlaylistQueue::new());
         self.strategy = mode::create_strategy(&self.state.mode, 0, None);
         if playing_from_this_queue {
             self.stop();

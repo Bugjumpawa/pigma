@@ -80,15 +80,12 @@ pub enum Command {
         /// Playback action. Possible values are listed below.
         action: MsgActionArg,
         /// Value for `play` (a song id), `search` (a keyword), `volume`
-        /// (`75`/`+5`/`-5`), the endpoint for `switch-list`/`list`, or omitted.
+        /// (`75`/`+5`/`-5`), the endpoint for `switch-list`, or omitted.
         #[arg(allow_hyphen_values = true, value_hint = ValueHint::Other)]
         value: Option<String>,
         /// Playlist index for `switch-list` (1-based).
         #[arg(long, value_name = "INDEX", value_hint = ValueHint::Other)]
         playlist: Option<usize>,
-        /// Output the queue as JSON (`list` with no value).
-        #[arg(long)]
-        json: bool,
         /// IPC socket path.
         #[arg(long, value_name = "SOCKET")]
         socket: Option<PathBuf>,
@@ -136,9 +133,6 @@ pub enum MsgActionArg {
     /// Toggle like on the current song.
     #[value(name = "toggle_like", alias = "unlike", alias = "toggle")]
     ToggleLike,
-    /// Print the playback queue (`▶` marks the current song), or switch queues
-    /// when given an endpoint.
-    List,
     /// Search songs across NCM + sonar sources.
     Search,
 }
@@ -155,17 +149,7 @@ pub async fn status(template: &str, json: bool, list: bool) -> color_eyre::Resul
         if json {
             println!("{}", serde_json::to_string_pretty(&queue)?);
         } else {
-            let current = queue.current_index;
-            for (i, song) in queue.songs.iter().enumerate() {
-                let marker = if Some(i) == current { ">" } else { " " };
-                println!(
-                    "{marker} {:<3} {:<32} {:<24} {}",
-                    i + 1,
-                    song.name,
-                    song.singer,
-                    format_duration(song.duration_ms)
-                );
-            }
+            print!("{}", render_queue(&queue));
         }
         return Ok(());
     }
@@ -183,60 +167,37 @@ pub async fn status(template: &str, json: bool, list: bool) -> color_eyre::Resul
     Ok(())
 }
 
-/// Render the playback queue the way the TUI's queue table does: `▶` marks the
-/// currently playing song, rows show a 1-based index, title, artist and duration.
+/// Render the queue as plain text: `>` marks the current song, and each row is
+/// `index  title  artist  duration  id`. The trailing song id lets the output
+/// feed straight into `pigma msg play <id>`.
 fn render_queue(queue: &ipc::QueueSnapshot) -> String {
     let current = queue.current_index;
     let mut out = String::new();
     for (i, song) in queue.songs.iter().enumerate() {
-        let marker = if Some(i) == current { "▶" } else { " " };
+        let marker = if Some(i) == current { ">" } else { " " };
         use std::fmt::Write;
         let _ = writeln!(
             out,
-            "{marker}{:02}  {:<24}  {:<20}  {}",
+            "{marker} {:<3} {:<32} {:<24} {:<8} {}",
             i + 1,
             song.name,
             song.singer,
-            format_duration(song.duration_ms)
+            format_duration(song.duration_ms),
+            song.id
         );
     }
     out
 }
 
-fn print_queue(queue: &ipc::QueueSnapshot) {
-    print!("{}", render_queue(queue));
-}
-
-/// `pigma msg` handler. `list` (no value) prints the live playback queue, and
-/// `search` is a request/response command (the daemon returns matching songs and
-/// registers them for a later `pigma msg play <id>`); everything else is a
-/// fire-and-forget control action.
+/// `pigma msg` handler. `search` is a request/response command (the daemon
+/// returns matching songs and registers them for a later `pigma msg play <id>`);
+/// everything else is a fire-and-forget control action.
 pub async fn msg(
     action: MsgActionArg,
     value: Option<&str>,
     playlist: Option<usize>,
-    json: bool,
 ) -> color_eyre::Result<()> {
     match action {
-        MsgActionArg::List => {
-            // `pigma msg list <endpoint>` keeps the old switch-list alias;
-            // `pigma msg list` with no value prints the live playback queue.
-            if let Some(endpoint) = value {
-                let action = MsgAction::SwitchList {
-                    endpoint: endpoint.to_string(),
-                    playlist,
-                };
-                ipc::send_msg(action).await?;
-                return Ok(());
-            }
-            let queue = ipc::fetch_queue().await?;
-            if json {
-                println!("{}", serde_json::to_string_pretty(&queue)?);
-            } else {
-                print_queue(&queue);
-            }
-            Ok(())
-        }
         MsgActionArg::Search => {
             let keyword = value.ok_or_else(|| {
                 color_eyre::eyre::eyre!(
@@ -307,7 +268,7 @@ fn parse_msg_action(
         MsgActionArg::Dislike => Ok(MsgAction::Dislike),
         MsgActionArg::ToggleLike => Ok(MsgAction::ToggleLike),
         // Handled above in `msg` before parsing.
-        MsgActionArg::List | MsgActionArg::Search => unreachable!(),
+        MsgActionArg::Search => unreachable!(),
     }
 }
 
@@ -447,10 +408,9 @@ pub async fn run_cli(mut cli: Cli) -> color_eyre::Result<Option<App>> {
             action,
             value,
             playlist,
-            json,
             ..
         }) => {
-            cli::msg(*action, value.as_deref(), *playlist, *json).await?;
+            cli::msg(*action, value.as_deref(), *playlist).await?;
             return Ok(None);
         }
         Some(Command::Completions { shell }) => {
@@ -591,19 +551,20 @@ mod tests {
     }
 
     #[test]
-    fn print_queue_marks_current_song() {
+    fn render_queue_marks_current_and_includes_id() {
         let queue = ipc::QueueSnapshot {
+            key: "test".into(),
             current_index: Some(0),
             songs: vec![
                 ipc::QueueEntry {
-                    id: 1,
+                    id: 111,
                     name: "Song A".into(),
                     singer: "Artist A".into(),
                     album: String::new(),
                     duration_ms: 125_000,
                 },
                 ipc::QueueEntry {
-                    id: 2,
+                    id: 222,
                     name: "Song B".into(),
                     singer: "Artist B".into(),
                     album: String::new(),
@@ -612,17 +573,16 @@ mod tests {
             ],
         };
         let out = render_queue(&queue);
-        let expected = format!(
-            "▶01  {:<24}  {:<20}  {}\n {:02}  {:<24}  {:<20}  {}\n",
-            "Song A",
-            "Artist A",
-            format_duration(125_000),
-            2,
-            "Song B",
-            "Artist B",
-            format_duration(65_000),
+        let mut lines = out.lines();
+        let first = lines.next().unwrap();
+        assert!(first.starts_with("> 1"), "current song not marked: {first}");
+        assert!(first.contains("111"), "song id missing: {first}");
+        let second = lines.next().unwrap();
+        assert!(
+            second.starts_with("  2"),
+            "non-current marker wrong: {second}"
         );
-        assert_eq!(out, expected);
+        assert!(second.contains("222"), "song id missing: {second}");
     }
 
     #[test]

@@ -240,6 +240,14 @@ impl PlaybackEngine {
         self.source.set_save_on_play(enabled);
     }
 
+    /// Swap the active queue, carrying the change counter forward so the IPC
+    /// queue snapshot still detects the switch. A freshly built [`PlaylistQueue`]
+    /// starts at version 0, which could otherwise collide with the previous
+    /// queue's version and leave `pigma status -L` showing a stale queue.
+    fn replace_queue(&mut self, queue: PlaylistQueue) {
+        self.queue.replace_with(queue);
+    }
+
     pub(super) fn start_current_song(&mut self, seek_time: Option<Duration>) {
         // Cancel any in-flight resolve for a previously requested song before
         // starting a new one, so a stale network request cannot finish late and
