@@ -4,8 +4,10 @@ use time::OffsetDateTime;
 
 use md5::{Digest, Md5};
 use reqwest::Client;
-use std::sync::Mutex;
-use std::time::{Duration, Instant};
+use std::{
+    sync::Mutex,
+    time::{Duration, Instant},
+};
 use urlencoding;
 
 const KUGOU_KEY_SUFFIX: &str = "kgcloudv2";

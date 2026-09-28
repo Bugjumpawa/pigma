@@ -1,10 +1,12 @@
-use crate::crypto::{invalidate_wbi_keys, wbi_sign};
-use crate::error::{Result, SonarError};
-use crate::model::{
-    PlayUrlResult, Quality, SearchQuery, SearchResult, SonarSource, Song, SongMeta, make_song_id,
+use crate::{
+    crypto::{invalidate_wbi_keys, wbi_sign},
+    error::{Result, SonarError},
+    model::{
+        PlayUrlResult, Quality, SearchQuery, SearchResult, SonarSource, Song, SongMeta,
+        make_song_id,
+    },
+    provider::{PRIORITY_BILIVIDEO, SonarProvider, build_client},
 };
-use crate::provider::SonarProvider;
-use crate::provider::{PRIORITY_BILIVIDEO, build_client};
 use async_trait::async_trait;
 use once_cell::sync::Lazy;
 use regex::Regex;

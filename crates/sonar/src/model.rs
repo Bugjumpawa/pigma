@@ -1,6 +1,8 @@
 use serde::{Deserialize, Deserializer, Serialize};
-use std::fmt;
-use std::hash::{Hash, Hasher};
+use std::{
+    fmt,
+    hash::{Hash, Hasher},
+};
 
 /// Sonar synthetic song ids carry the top bit so callers can distinguish
 /// third-party search results from NCM songs.

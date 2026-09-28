@@ -1,12 +1,11 @@
-use aes::Aes128;
-use aes::cipher::{BlockCipherEncrypt, KeyInit};
+use aes::{
+    Aes128,
+    cipher::{BlockCipherEncrypt, KeyInit},
+};
 use base64::{Engine, engine::general_purpose};
 use md5::{Digest, Md5};
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC};
-use rsa::BigUint;
-use rsa::RsaPublicKey;
-use rsa::pkcs8::DecodePublicKey;
-use rsa::traits::PublicKeyParts;
+use rsa::{BigUint, RsaPublicKey, pkcs8::DecodePublicKey, traits::PublicKeyParts};
 use std::sync::LazyLock;
 
 /// Raw RSA public key modulus and exponent for encryption without padding

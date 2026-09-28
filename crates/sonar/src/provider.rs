@@ -1,5 +1,7 @@
-use crate::error::Result;
-use crate::model::{PlayUrlResult, Quality, SearchQuery, SearchResult, SonarSource, Song};
+use crate::{
+    error::Result,
+    model::{PlayUrlResult, Quality, SearchQuery, SearchResult, SonarSource, Song},
+};
 use async_trait::async_trait;
 use reqwest::Client;
 
