@@ -234,6 +234,11 @@ impl Config {
             return;
         }
         let content = self.to_toml();
+        // Never clobber the user's config with an empty serialization result.
+        if content.trim().is_empty() {
+            log::error!("Refusing to write an empty config.toml");
+            return;
+        }
         if let Err(e) = fs::write(dir.join("config.toml"), content) {
             log::error!("Failed to write config.toml: {e}");
         }
@@ -245,7 +250,13 @@ impl Config {
         // reshaping below only applies when the expected tables exist — an
         // unusual config (e.g. empty `navigation.sections`) just skips the
         // reshaping instead of panicking.
-        let raw = toml_edit::ser::to_string_pretty(self).unwrap_or_default();
+        let raw = match toml_edit::ser::to_string_pretty(self) {
+            Ok(raw) => raw,
+            Err(e) => {
+                log::error!("Failed to serialize config: {e}");
+                return String::new();
+            }
+        };
         let Ok(mut doc) = raw.parse::<toml_edit::DocumentMut>() else {
             return raw;
         };

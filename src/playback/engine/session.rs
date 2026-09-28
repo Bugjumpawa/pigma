@@ -22,7 +22,7 @@ impl PlaybackEngine {
     }
 
     /// Cached breadcrumb keys of all queues (disk + active), in no particular
-    /// order. Refresh with [`Self::refresh_queue_keys`] after any change.
+    /// order. Refresh with `refresh_queue_keys` after any change.
     pub fn queue_keys(&self) -> &[String] {
         &self.queue_keys_cache
     }

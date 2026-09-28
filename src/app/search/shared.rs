@@ -3,7 +3,7 @@
 //! The TUI search is async-fire-and-forget (spawns a task, pushes
 //! [`crate::event::NavigationEvent`]s, updates navigation state) while the
 //! IPC server must answer `pigma msg search` synchronously, so the *orchestration*
-//! lives apart (see `super::search` for the TUI side) — but the actual search
+//! lives apart (see [`super`] for the TUI side) — but the actual search
 //! execution, result conversion and registration are shared here: both paths
 //! call [`search_ncm`] / [`search_sonar`].
 

@@ -193,7 +193,7 @@ impl ApiService {
     }
 
     /// Resolve an endpoint into a displayable [`ContentState`], handling the local
-    /// sources (`Download` / `LocalMusic`) and `LikedSongs` that [`resolve_content`]
+    /// sources (`Download` / `LocalMusic`) and `LikedSongs` that [`Self::resolve_content`]
     /// deliberately leaves to its caller. Shared by `App::load_endpoint` (which then
     /// loads the resolved songs into the queue) and the TUI's content page, so the
     /// endpoint→content mapping lives in exactly one place.

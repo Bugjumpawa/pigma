@@ -10,12 +10,11 @@ mod login;
 mod lyrics;
 mod navigation;
 mod search;
-mod search_core;
 mod snapshot;
 mod splash;
 mod theme;
 
-pub use search_core::{SearchEngine, SearchHost, SearchResults};
+pub use search::shared::{SearchEngine, SearchHost, SearchResults};
 
 use snapshot::IpcState;
 

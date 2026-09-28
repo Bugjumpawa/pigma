@@ -1,10 +1,13 @@
+//! TUI search-bar orchestration: turns keyboard input into navigation state and
+//! spawned searches, surfacing results via [`crate::event::NavigationEvent`]s.
+//! The execution shared with the IPC `search` server lives in [`shared`].
+
+pub mod shared;
+
 use std::sync::Arc;
 
-use super::{
-    App,
-    event::send_event,
-    search_core::{search_ncm, search_sonar},
-};
+use self::shared::{search_ncm, search_sonar};
+use super::{App, event::send_event};
 use crate::{
     event::NavigationEvent,
     state::{ContentState, SearchProvider},
@@ -20,7 +23,7 @@ impl App {
     }
 
     /// TUI-only orchestration for an NCM search: mark the loading state, spawn
-    /// the search (delegating to [`search_core::search_ncm`]) and hand the
+    /// the search (delegating to [`shared::search_ncm`]) and hand the
     /// resulting `ContentState` to the navigation via an event.
     fn submit_ncm_search(&mut self, keyword: String) {
         self.state.navigation.set_content(ContentState::Loading);
@@ -39,7 +42,7 @@ impl App {
 
     /// TUI-only orchestration for a single-source sonar search: build a finder
     /// restricted to the selected provider, then delegate to
-    /// [`search_core::search_sonar`] and surface the result via an event.
+    /// [`shared::search_sonar`] and surface the result via an event.
     fn submit_sonar_search(&mut self, keyword: String, provider: SearchProvider) {
         self.state.navigation.set_content(ContentState::Loading);
         self.state.navigation.content_is_search = true;

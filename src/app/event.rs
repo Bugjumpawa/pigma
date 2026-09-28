@@ -1,3 +1,6 @@
+//! Application event loop: pulls events from the runtime channel, dispatches
+//! each to its `App` handler, and applies IPC control requests.
+
 use std::time::Duration;
 
 use crossterm::event::Event as CrosstermEvent;
