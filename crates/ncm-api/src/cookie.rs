@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::{
+    collections::{HashMap, HashSet},
+    path::{Path, PathBuf},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+};
 
 const SAVE_INTERVAL: Duration = Duration::from_secs(10);
 
@@ -21,6 +23,13 @@ fn generate_device_id() -> String {
 pub struct CookieStore {
     /// Persistent cookies (from set-cookie, serialized to disk)
     cookies: HashMap<String, String>,
+    /// Cookie names that were already on disk when this store was created.
+    /// Used by [`Self::flush`] to write back only what this instance actually
+    /// changed, so a second concurrently-running instance cannot clobber
+    /// cookies it did not fetch.
+    loaded: HashSet<String>,
+    /// Cookie names this instance has set or removed since creation.
+    dirty: HashSet<String>,
     /// Session-level random identifiers (regenerated at each startup, not persisted)
     session: SessionCookies,
     /// Disk path
@@ -31,7 +40,7 @@ pub struct CookieStore {
     last_save: Instant,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct Persisted {
     cookies: HashMap<String, String>,
 }
@@ -68,13 +77,9 @@ impl SessionCookies {
 
 impl CookieStore {
     pub fn new(path: PathBuf) -> Self {
-        let persisted: Persisted = std::fs::read_to_string(&path)
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or(Persisted {
-                cookies: HashMap::new(),
-            });
+        let persisted = read_persisted(&path).unwrap_or_default();
 
+        let loaded = persisted.cookies.keys().cloned().collect();
         let mut cookies = persisted.cookies;
         // Device fingerprint: persisted and kept consistent across restarts (reduces the chance of triggering risk control)
         if !cookies.contains_key("deviceId") {
@@ -85,6 +90,8 @@ impl CookieStore {
 
         Self {
             cookies,
+            loaded,
+            dirty: HashSet::new(),
             session: SessionCookies::new(),
             path,
             csrf,
@@ -153,6 +160,7 @@ impl CookieStore {
 
             if self.cookies.get(&name) != Some(&value) {
                 changed = true;
+                self.dirty.insert(name.clone());
                 self.cookies.insert(name, value);
             }
         }
@@ -175,35 +183,59 @@ impl CookieStore {
     /// Remove the specified cookie
     pub fn remove(&mut self, name: &str) {
         self.cookies.remove(name);
+        self.dirty.insert(name.to_string());
     }
 
-    /// Force a write to disk
+    /// Force a write to disk.
+    ///
+    /// The current on-disk state is re-read and only this instance's changes
+    /// are applied on top of it, then the result is written atomically (temp
+    /// file + rename). This prevents a second concurrently-running instance
+    /// from clobbering cookies it did not fetch, and stops a concurrent reader
+    /// from ever observing a truncated/empty file.
     pub fn flush(&mut self) {
-        let persisted = Persisted {
-            cookies: self.cookies.clone(),
-        };
-        if let Some(parent) = self.path.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-        if let Ok(json) = serde_json::to_string_pretty(&persisted) {
-            #[cfg(unix)]
-            let written = {
-                use std::os::unix::fs::OpenOptionsExt;
-                std::fs::OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .truncate(true)
-                    .mode(0o600)
-                    .open(&self.path)
-                    .and_then(|mut f| std::io::Write::write_all(&mut f, json.as_bytes()))
-            };
-            #[cfg(not(unix))]
-            let written = std::fs::write(&self.path, &json);
-            if let Err(e) = written {
-                log::warn!("failed to write cookie file {:?}: {}", self.path, e);
+        let merged = self.merged_for_disk();
+        match write_persisted(&self.path, &merged) {
+            Ok(()) => {
+                self.loaded = merged.keys().cloned().collect();
+                self.dirty.clear();
             }
+            Err(e) => log::warn!("failed to write cookie file {:?}: {}", self.path, e),
         }
         self.last_save = Instant::now();
+    }
+
+    /// Re-read the file and overlay only this instance's changes. A persisted
+    /// `deviceId` always wins over a locally generated one, so a store that
+    /// failed to load (e.g. started mid-write) cannot replace the fingerprint.
+    fn merged_for_disk(&self) -> HashMap<String, String> {
+        let Some(disk) = read_persisted(&self.path) else {
+            // No readable file (missing or corrupt): fall back to our full
+            // in-memory state, which also restores cookies if the file was
+            // deleted underneath us.
+            return self.cookies.clone();
+        };
+
+        let mut merged = disk.cookies;
+        let disk_has_device_id = merged.contains_key("deviceId");
+
+        for (name, value) in &self.cookies {
+            if name == "deviceId" && disk_has_device_id {
+                continue;
+            }
+            if self.dirty.contains(name) || !self.loaded.contains(name) {
+                merged.insert(name.clone(), value.clone());
+            }
+        }
+
+        // Explicit removals win over anything still on disk.
+        for name in &self.dirty {
+            if !self.cookies.contains_key(name) {
+                merged.remove(name);
+            }
+        }
+
+        merged
     }
 
     fn flush_if_stale(&mut self) {
@@ -211,6 +243,66 @@ impl CookieStore {
             self.flush();
         }
     }
+}
+
+/// Read and parse the persisted cookie file, returning `None` when it is
+/// missing or cannot be parsed.
+fn read_persisted(path: &Path) -> Option<Persisted> {
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+}
+
+/// Atomically write the persisted cookies to `path`.
+///
+/// A unique temp file is written in the same directory (mode `0600` on Unix)
+/// and then renamed over the target — `rename` is atomic, so a concurrent
+/// reader always sees either the old or the new complete file.
+fn write_persisted(path: &Path, cookies: &HashMap<String, String>) -> std::io::Result<()> {
+    let persisted = Persisted {
+        cookies: cookies.clone(),
+    };
+    let json = serde_json::to_string_pretty(&persisted)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+
+    let dir = path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    std::fs::create_dir_all(dir)?;
+
+    let file_name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("cookies.json");
+    let tmp = dir.join(format!(
+        ".{file_name}.{}.{}.tmp",
+        std::process::id(),
+        rand::random::<u32>()
+    ));
+
+    if let Err(e) = write_temp_file(&tmp, json.as_bytes()) {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(e);
+    }
+    if let Err(e) = std::fs::rename(&tmp, path) {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(e);
+    }
+    Ok(())
+}
+
+fn write_temp_file(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let mut opts = std::fs::OpenOptions::new();
+    opts.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        opts.mode(0o600);
+    }
+    let mut file = opts.open(path)?;
+    std::io::Write::write_all(&mut file, bytes)?;
+    file.sync_all()
 }
 
 impl Drop for CookieStore {
@@ -331,6 +423,66 @@ mod tests {
             .cookies
             .insert("__csrf".to_string(), "csrf".to_string());
         assert!(store.is_logged_in());
+        let _ = std::fs::remove_file(path);
+    }
+
+    fn read_disk(path: &Path) -> HashMap<String, String> {
+        read_persisted(path).map(|p| p.cookies).unwrap_or_default()
+    }
+
+    #[test]
+    fn flush_does_not_clobber_another_instances_cookies() {
+        let path = temp_cookie_path();
+
+        // Instance A logs in and persists a session.
+        let mut a = CookieStore::new(path.clone());
+        a.cookies.insert("MUSIC_U".into(), "token".into());
+        a.dirty.insert("MUSIC_U".into());
+        a.flush();
+        let device = a.device_id().to_string();
+
+        // Instance B started while A was writing, so it loaded nothing: only a
+        // freshly generated deviceId. On shutdown it must not wipe A's login.
+        let mut b = CookieStore::new(path.clone());
+        b.cookies.clear();
+        b.cookies.insert("deviceId".into(), "B".into());
+        b.loaded.clear();
+        b.dirty.clear();
+        b.flush();
+
+        let disk = read_disk(&path);
+        assert_eq!(
+            disk.get("MUSIC_U").map(String::as_str),
+            Some("token"),
+            "instance B wiped instance A's login cookie"
+        );
+        assert_eq!(
+            disk.get("deviceId").map(String::as_str),
+            Some(device.as_str()),
+            "a persisted deviceId must not be replaced by a generated one"
+        );
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn removal_is_persisted_without_dropping_unrelated_cookies() {
+        let path = temp_cookie_path();
+        let mut a = CookieStore::new(path.clone());
+        a.cookies.insert("MUSIC_U".into(), "token".into());
+        a.cookies.insert("__csrf".into(), "csrf".into());
+        a.dirty.extend(["MUSIC_U".into(), "__csrf".into()]);
+        a.flush();
+
+        // A second instance logs out: only MUSIC_U is removed.
+        let mut b = CookieStore::new(path.clone());
+        b.remove("MUSIC_U");
+        b.flush();
+
+        let disk = read_disk(&path);
+        assert!(!disk.contains_key("MUSIC_U"));
+        assert_eq!(disk.get("__csrf").map(String::as_str), Some("csrf"));
+
         let _ = std::fs::remove_file(path);
     }
 }
