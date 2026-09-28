@@ -1,3 +1,46 @@
+## [0.2.15] - 2026-09-28
+
+### 🚀 Features
+
+- *(cli)* [**breaking**] List the queue via `pigma status -L` with song ids; drop `pigma msg list` (@akirco)
+
+### 🐛 Bug Fixes
+
+- Bound debug log truncation to UTF-8 char boundaries (@wbbo)
+- *(config)* Make to_toml resilient to unusual configs (@akirco)
+- *(ncm-api)* Stop concurrent instances from wiping cookies.json (@t)
+
+### 💼 Other
+
+- *(deps)* Bump ratatui-image from 11.0.6 to 11.0.8 (@dependabot[bot])
+
+### 🚜 Refactor
+
+- *(playback)* Split PlaybackEngine into queueing/session/transport submodules (@akirco)
+- *(app)* Extract lyric/cover pipelines from handle_playback_started into app::cover (@akirco)
+- *(service)* Extract shared ApiService::load_local_music (@akirco)
+- *(app)* Group App fields into search::SearchHost and ipc::IpcState (@akirco)
+- *(app)* Move lyric pipeline out of cover.rs into app::lyrics (@akirco)
+- Relocate misplaced helpers to modules matching their purpose (@akirco)
+- *(ipc)* Split ipc.rs into protocol/snapshot/path/server/client submodules (@akirco)
+- *(app)* Move handle_ipc_event into app::event (@akirco)
+- *(app)* Extract headless daemon into app::headless (@akirco)
+- *(utils)* Move mem_rss_kb into utils::process (@akirco)
+- *(state)* Move current_queue_key onto NavigationState (@akirco)
+- *(utils)* Share canonical audio extension mapping (@akirco)
+- *(playback)* Move heartbeat impl into engine/heartbeat (@akirco)
+- *(app)* Nest search core under search; harden config save (@t)
+- *(ipc)* Extract platform transport module (@t)
+
+### 🎨 Styling
+
+- Apply nightly rustfmt to extracted modules (@akirco)
+- Apply nightly rustfmt to relocated helpers (@akirco)
+- Apply nightly rustfmt to ncm-api and sonar (@akirco)
+
+### ⚙️ Miscellaneous Tasks
+
+- Gitignore cookies.json (login credentials) (@akirco)
 ## [0.2.14] - 2026-09-12
 
 ### 🚀 Features
