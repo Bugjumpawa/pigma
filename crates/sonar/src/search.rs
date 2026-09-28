@@ -1,8 +1,10 @@
-use crate::error::Result;
-use crate::model::{SearchQuery, SearchResult, SonarSource, Song};
-use crate::provider::{
-    SonarProvider, bilivideo::BiliVideoProvider, kugou::KugouProvider, kuwo::KuwoProvider,
-    youtube::YoutubeProvider,
+use crate::{
+    error::Result,
+    model::{SearchQuery, SearchResult, SonarSource, Song},
+    provider::{
+        SonarProvider, bilivideo::BiliVideoProvider, kugou::KugouProvider, kuwo::KuwoProvider,
+        youtube::YoutubeProvider,
+    },
 };
 use std::sync::Arc;
 use tokio::sync::mpsc;

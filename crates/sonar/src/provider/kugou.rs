@@ -1,10 +1,12 @@
-use crate::crypto::kugou_md5_key;
-use crate::error::{Result, SonarError};
-use crate::model::{
-    PlayUrlResult, Quality, SearchQuery, SearchResult, SonarSource, Song, SongMeta, make_song_id,
+use crate::{
+    crypto::kugou_md5_key,
+    error::{Result, SonarError},
+    model::{
+        PlayUrlResult, Quality, SearchQuery, SearchResult, SonarSource, Song, SongMeta,
+        make_song_id,
+    },
+    provider::{PRIORITY_KUGOU, SonarProvider, build_client},
 };
-use crate::provider::SonarProvider;
-use crate::provider::{PRIORITY_KUGOU, build_client};
 use async_trait::async_trait;
 use reqwest::Client;
 use serde_json::Value;

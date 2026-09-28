@@ -1,10 +1,12 @@
 use super::{cookie::CookieStore, encrypt, error::NcmError};
 use reqwest::Client;
 use serde_json::Value;
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 mod album;
 mod artist;

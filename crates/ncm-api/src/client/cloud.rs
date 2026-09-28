@@ -415,8 +415,7 @@ fn parse_audio_meta<R: std::io::Read + std::io::Seek>(
     reader: R,
     mime: &str,
 ) -> (String, String, String) {
-    use lofty::file::TaggedFileExt;
-    use lofty::tag::ItemKey;
+    use lofty::{file::TaggedFileExt, tag::ItemKey};
     let file_type = match mime {
         "audio/flac" => Some(lofty::file::FileType::Flac),
         "audio/wav" => Some(lofty::file::FileType::Wav),

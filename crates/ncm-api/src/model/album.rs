@@ -1,5 +1,8 @@
-use super::song::{SongInfo, parse_song_info_array};
-use super::{SongContext, u64_val};
+use super::{
+    SongContext,
+    song::{SongInfo, parse_song_info_array},
+    u64_val,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
